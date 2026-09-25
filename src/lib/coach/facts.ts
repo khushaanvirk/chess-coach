@@ -107,7 +107,10 @@ const describeTargets = (targets: Target[]): string => {
  * Pieces of the side not making the move that the moved piece attacks after
  * `uci`, if it hits two or more of them (king or pieces worth 3+).
  */
-export const getForkTargets = (fen: string, uci: string | undefined): Target[] => {
+export const getForkTargets = (
+  fen: string,
+  uci: string | undefined
+): Target[] => {
   if (!uci) return [];
 
   const game = new Chess(fen);
@@ -185,7 +188,8 @@ const findHangingPiece = (
       .sort((a, b) => PIECE_VALUES[a] - PIECE_VALUES[b])[0];
 
     const undefended = defenders.length === 0;
-    const cheaperAttacker = PIECE_VALUES[cheapest] < PIECE_VALUES[original.type];
+    const cheaperAttacker =
+      PIECE_VALUES[cheapest] < PIECE_VALUES[original.type];
     if (undefended || cheaperAttacker) {
       return {
         target: { square: move.to, type: original.type },
@@ -219,13 +223,16 @@ export const computeMomentFacts = (input: MomentFactsInput): MomentFacts => {
   );
 
   const reply = refutationLine[0];
-  if (reply?.includes("+") || reply?.includes("#")) tags.push("refutation_check");
+  if (reply?.includes("+") || reply?.includes("#"))
+    tags.push("refutation_check");
   if (reply?.includes("x")) tags.push("refutation_capture");
 
   const forkTargets = getForkTargets(fenAfter, refutationPv[0]);
   if (forkTargets.length && reply) {
     tags.push("fork");
-    hints.push(`The engine's reply ${reply} forks your ${describeTargets(forkTargets)}.`);
+    hints.push(
+      `The engine's reply ${reply} forks your ${describeTargets(forkTargets)}.`
+    );
   }
 
   const hanging = findHangingPiece(fenAfter, refutationPv, userSide);
@@ -243,7 +250,9 @@ export const computeMomentFacts = (input: MomentFactsInput): MomentFacts => {
     const missedFork = getForkTargets(fenBefore, bestPv[0]);
     if (missedFork.length) {
       tags.push("missed_fork");
-      hints.push(`The best move ${bestSan} would have forked the ${describeTargets(missedFork)}.`);
+      hints.push(
+        `The best move ${bestSan} would have forked the ${describeTargets(missedFork)}.`
+      );
     }
 
     const gainMissed = materialAfterBestLine - materialAfterPlayedLine;
@@ -260,13 +269,22 @@ export const computeMomentFacts = (input: MomentFactsInput): MomentFacts => {
 
   const mateBefore = input.bestLineMateForUser;
   const mateAfter = input.playedLineMateForUser;
-  if (bestSan && mateBefore !== undefined && mateBefore > 0 && !(mateAfter !== undefined && mateAfter > 0)) {
+  if (
+    bestSan &&
+    mateBefore !== undefined &&
+    mateBefore > 0 &&
+    !(mateAfter !== undefined && mateAfter > 0)
+  ) {
     tags.push("missed_mate");
-    hints.push(`You had a forced mate in ${mateBefore} starting with ${bestSan}.`);
+    hints.push(
+      `You had a forced mate in ${mateBefore} starting with ${bestSan}.`
+    );
   }
   if (mateAfter !== undefined && mateAfter < 0) {
     tags.push("allows_mate");
-    hints.push(`After ${playedSan}, the opponent has a forced mate in ${Math.abs(mateAfter)}.`);
+    hints.push(
+      `After ${playedSan}, the opponent has a forced mate in ${Math.abs(mateAfter)}.`
+    );
   }
 
   return {
@@ -289,7 +307,8 @@ export const getGamePhase = (fen: string): GamePhase => {
     .board()
     .flat()
     .reduce(
-      (sum, cell) => (cell && cell.type !== "p" ? sum + PIECE_VALUES[cell.type] : sum),
+      (sum, cell) =>
+        cell && cell.type !== "p" ? sum + PIECE_VALUES[cell.type] : sum,
       0
     );
 
@@ -298,7 +317,9 @@ export const getGamePhase = (fen: string): GamePhase => {
 
 const CLOCK_PATTERN = /\[%clk\s+(\d+):(\d{1,2}):(\d{1,2}(?:\.\d+)?)\]/;
 
-export const parseClockSeconds = (comment: string | undefined): number | undefined => {
+export const parseClockSeconds = (
+  comment: string | undefined
+): number | undefined => {
   const match = comment?.match(CLOCK_PATTERN);
   if (!match) return undefined;
   const [, h, m, s] = match;

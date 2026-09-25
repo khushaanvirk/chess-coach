@@ -3,6 +3,7 @@ import PanelHeader from "@/sections/analysis/panelHeader";
 import PanelToolBar from "@/sections/analysis/panelToolbar";
 import AnalysisTab from "@/sections/analysis/panelBody/analysisTab";
 import ClassificationTab from "@/sections/analysis/panelBody/classificationTab";
+import CoachTab from "@/sections/analysis/panelBody/coachTab";
 import { boardAtom, gameAtom, gameEvalAtom } from "@/sections/analysis/states";
 import {
   Box,
@@ -10,11 +11,14 @@ import {
   Grid2 as Grid,
   Tab,
   Tabs,
+  ToggleButton,
+  ToggleButtonGroup,
   useMediaQuery,
   useTheme,
 } from "@mui/material";
 import { useAtomValue } from "jotai";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/router";
 import { Icon } from "@iconify/react";
 import EngineSettingsButton from "@/sections/engineSettings/engineSettingsButton";
 import GraphTab from "@/sections/analysis/panelBody/graphTab";
@@ -23,6 +27,9 @@ import { PageTitle } from "@/components/pageTitle";
 export default function GameAnalysis() {
   const theme = useTheme();
   const [tab, setTab] = useState(0);
+  const [lgPanel, setLgPanel] = useState<"moves" | "coach">("moves");
+  const router = useRouter();
+  const openedAtPly = typeof router.query.ply === "string";
   const isLgOrGreater = useMediaQuery(theme.breakpoints.up("lg"));
 
   const gameEval = useAtomValue(gameEvalAtom);
@@ -34,11 +41,17 @@ export default function GameAnalysis() {
   useEffect(() => {
     if (tab === 1 && !showMovesTab) setTab(0);
     if (tab === 2 && !gameEval) setTab(0);
+    if (tab === 3 && !gameEval) setTab(0);
   }, [showMovesTab, gameEval, tab]);
+
+  // Links from the trends page land on a specific move: show the coach's take.
+  useEffect(() => {
+    if (openedAtPly) setLgPanel("coach");
+  }, [openedAtPly]);
 
   return (
     <Grid container gap={4} justifyContent="space-evenly" alignItems="start">
-      <PageTitle title="Chesskit Game Analysis" />
+      <PageTitle title="Chess Coach · Analysis" />
 
       <Board />
 
@@ -139,6 +152,20 @@ export default function GameAnalysis() {
                 }}
                 disableFocusRipple
               />
+
+              <Tab
+                label="Coach"
+                id="tab3"
+                icon={<Icon icon="mdi:school-outline" height={15} />}
+                iconPosition="start"
+                sx={{
+                  textTransform: "none",
+                  minHeight: 15,
+                  display: gameEval ? undefined : "none",
+                  padding: "5px 0em 12px",
+                }}
+                disableFocusRipple
+              />
             </Tabs>
           </Box>
         )}
@@ -155,10 +182,50 @@ export default function GameAnalysis() {
           id="tabContent0"
         />
 
+        {isLgOrGreater && showMovesTab && (
+          <ToggleButtonGroup
+            exclusive
+            size="small"
+            value={lgPanel}
+            onChange={(_, value) => value && setLgPanel(value)}
+            aria-label="Moves or coach"
+            sx={{ alignSelf: "center" }}
+          >
+            <ToggleButton
+              value="moves"
+              sx={{ textTransform: "none", paddingX: 2 }}
+            >
+              <Icon
+                icon="mdi:format-list-bulleted"
+                height={15}
+                style={{ marginRight: 6 }}
+              />
+              Moves
+            </ToggleButton>
+            <ToggleButton
+              value="coach"
+              sx={{ textTransform: "none", paddingX: 2 }}
+            >
+              <Icon
+                icon="mdi:school-outline"
+                height={15}
+                style={{ marginRight: 6 }}
+              />
+              Coach
+            </ToggleButton>
+          </ToggleButtonGroup>
+        )}
+
         <ClassificationTab
           role="tabpanel"
-          hidden={tab !== 1 && !isLgOrGreater}
+          hidden={isLgOrGreater ? lgPanel !== "moves" : tab !== 1}
           id="tabContent1"
+        />
+
+        <CoachTab
+          role="tabpanel"
+          hidden={isLgOrGreater ? lgPanel !== "coach" : tab !== 3}
+          id="tabContent3"
         />
 
         {isLgOrGreater && (

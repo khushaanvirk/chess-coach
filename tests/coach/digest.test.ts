@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Chess } from "chess.js";
-import { buildDigest, getOutcome, getTimeClass } from "@/lib/coach/digest";
+import { buildDigest, getOutcome, getTimeClass, summarizeDigests } from "@/lib/coach/digest";
 import { buildReviewPacket } from "@/lib/coach/packet";
 import { validateReviewOutput } from "@/lib/coach/validate";
 import { TRAP_PGN, trapEval } from "./fixtures";
@@ -84,5 +84,60 @@ describe("buildDigest", () => {
       lesson: "Check queen moves.",
     });
     expect(digest.moments[0].clockSeconds).toBeCloseTo(571.4);
+  });
+});
+
+describe("summarizeDigests", () => {
+  const base = {
+    userName: "me",
+    userSide: "w" as const,
+    opponentName: "o",
+    timeClass: "blitz" as const,
+    reviewedAt: "2026-09-25T00:00:00.000Z",
+  };
+  const m = (label: "blunder" | "mistake" | "great", phase: "opening" | "middlegame" | "endgame", clockSeconds?: number) => ({
+    ply: 1,
+    moveNumber: "1.",
+    label,
+    phase,
+    tags: [],
+    title: "",
+    lesson: "",
+    clockSeconds,
+  });
+
+  it("aggregates results, accuracy, error phases and time trouble", () => {
+    const stats = summarizeDigests([
+      {
+        ...base,
+        gameKey: "a",
+        outcome: "win",
+        accuracy: { user: 80, opponent: 60 },
+        counts: { blunder: 1, miss: 0, mistake: 1, inaccuracy: 0, brilliant: 0, great: 1 },
+        moments: [m("blunder", "middlegame", 12), m("mistake", "endgame", 90), m("great", "opening")],
+      },
+      {
+        ...base,
+        gameKey: "b",
+        outcome: "loss",
+        accuracy: { user: 60, opponent: 85 },
+        counts: { blunder: 2, miss: 0, mistake: 0, inaccuracy: 0, brilliant: 0, great: 0 },
+        moments: [m("blunder", "middlegame", 25), m("blunder", "opening")],
+      },
+    ]);
+
+    expect(stats).toEqual({
+      games: 2,
+      record: { win: 1, loss: 1, draw: 0 },
+      averageAccuracy: 70,
+      errorsPerGame: 2,
+      errorPhases: { opening: 1, middlegame: 2, endgame: 1 },
+      timeTroubleErrors: 2,
+    });
+  });
+
+  it("handles no games", () => {
+    expect(summarizeDigests([]).games).toBe(0);
+    expect(summarizeDigests([]).averageAccuracy).toBe(0);
   });
 });

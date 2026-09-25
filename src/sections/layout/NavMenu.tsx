@@ -19,6 +19,8 @@ const MenuOptions = [
     icon: "streamline:database",
     href: "/database",
   },
+  { text: "Trends", icon: "mdi:chart-timeline-variant", href: "/trends" },
+  { text: "Practise mistakes", icon: "mdi:target", href: "/retry" },
 ];
 
 interface Props {

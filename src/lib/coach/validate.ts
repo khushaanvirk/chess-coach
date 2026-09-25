@@ -41,17 +41,27 @@ const trendsOutputSchema = z.object({
     z.object({
       name: z.string(),
       description: z.string(),
-      evidence: z.array(z.object({ gameKey: z.string(), ply: z.number().int() })),
+      evidence: z.array(
+        z.object({ gameKey: z.string(), ply: z.number().int() })
+      ),
     })
   ),
   strengths: z.array(z.string()),
-  focusAreas: z.array(z.object({ what: z.string(), howToPractice: z.string() })),
+  focusAreas: z.array(
+    z.object({ what: z.string(), howToPractice: z.string() })
+  ),
 });
 
-const parseOrThrow = <T>(schema: z.ZodType<T>, raw: unknown, what: string): T => {
+const parseOrThrow = <T>(
+  schema: z.ZodType<T>,
+  raw: unknown,
+  what: string
+): T => {
   const result = schema.safeParse(raw);
   if (!result.success) {
-    throw new InvalidCoachOutputError(`Claude's ${what} didn't match the expected format.`);
+    throw new InvalidCoachOutputError(
+      `Claude's ${what} didn't match the expected format.`
+    );
   }
   return result.data;
 };
@@ -62,7 +72,10 @@ const MOVE_MENTION =
   /(?<![A-Za-z0-9])(O-O-O|O-O|0-0-0|0-0|[KQRBN][a-h]?[1-8]?x?[a-h][1-8]|[a-h]x[a-h][1-8](?:=[QRBN])?|[a-h][18]=[QRBN])[+#]?(?![A-Za-z0-9])/g;
 
 const normalizeMove = (san: string): string =>
-  san.replace(/[+#!?]/g, "").replace(/^0-0-0$/, "O-O-O").replace(/^0-0$/, "O-O");
+  san
+    .replace(/[+#!?]/g, "")
+    .replace(/^0-0-0$/, "O-O-O")
+    .replace(/^0-0$/, "O-O");
 
 export const extractMoveMentions = (text: string): string[] =>
   Array.from(text.matchAll(MOVE_MENTION), (match) => normalizeMove(match[1]));
@@ -72,6 +85,7 @@ const allowedMoves = (moment: PacketMoment, gameSans: string[]): Set<string> =>
     [
       moment.playedMove,
       moment.bestMove ?? "",
+      ...moment.goodMoves,
       ...moment.bestLine,
       ...moment.refutationLine,
       ...gameSans,
@@ -90,7 +104,9 @@ const LABEL_TITLES: Record<PacketMoment["label"], string> = {
 };
 
 /** Factual stand-in, built only from engine data, when Claude skipped a moment. */
-const fallbackMoment = (moment: PacketMoment): Pick<ReviewedMoment, "title" | "explanation" | "lesson"> => {
+const fallbackMoment = (
+  moment: PacketMoment
+): Pick<ReviewedMoment, "title" | "explanation" | "lesson"> => {
   const title = `${LABEL_TITLES[moment.label]}: ${moment.moveNumber}${moment.playedMove}`;
   if (!moment.bestMove) {
     return {
@@ -99,7 +115,8 @@ const fallbackMoment = (moment: PacketMoment): Pick<ReviewedMoment, "title" | "e
       lesson: "",
     };
   }
-  const line = moment.bestLine.length > 1 ? ` (${moment.bestLine.join(" ")})` : "";
+  const line =
+    moment.bestLine.length > 1 ? ` (${moment.bestLine.join(" ")})` : "";
   return {
     title,
     explanation: `${moment.playedMove} took your winning chances from ${moment.winChanceBefore}% to ${moment.winChanceAfter}%. The engine preferred ${moment.bestMove}${line}.`,
@@ -128,9 +145,9 @@ export const validateReviewOutput = (
     const unverifiedMoves = written
       ? Array.from(
           new Set(
-            extractMoveMentions(`${text.title} ${text.explanation} ${text.lesson}`).filter(
-              (move) => !allowed.has(move)
-            )
+            extractMoveMentions(
+              `${text.title} ${text.explanation} ${text.lesson}`
+            ).filter((move) => !allowed.has(move))
           )
         )
       : [];
@@ -139,8 +156,11 @@ export const validateReviewOutput = (
       ply: moment.ply,
       moveNumber: moment.moveNumber,
       label: moment.label,
+      fen: moment.fen,
       playedMove: moment.playedMove,
       bestMove: moment.bestMove,
+      goodMoves: moment.goodMoves,
+      winChanceBefore: moment.winChanceBefore,
       title: text.title.trim(),
       explanation: text.explanation.trim(),
       lesson: text.lesson.trim(),
@@ -164,14 +184,21 @@ export type ValidatedTrends = Pick<
   "headline" | "patterns" | "strengths" | "focusAreas"
 >;
 
-export const validateTrendsOutput = (raw: unknown, digests: GameDigest[]): ValidatedTrends => {
+export const validateTrendsOutput = (
+  raw: unknown,
+  digests: GameDigest[]
+): ValidatedTrends => {
   const output = parseOrThrow(trendsOutputSchema, raw, "trends report");
-  const known = new Map(digests.map((d) => [d.gameKey, new Set(d.moments.map((m) => m.ply))]));
+  const known = new Map(
+    digests.map((d) => [d.gameKey, new Set(d.moments.map((m) => m.ply))])
+  );
 
   const patterns: TrendPattern[] = output.patterns
     .map((pattern) => ({
       ...pattern,
-      evidence: pattern.evidence.filter((e) => known.get(e.gameKey)?.has(e.ply)),
+      evidence: pattern.evidence.filter((e) =>
+        known.get(e.gameKey)?.has(e.ply)
+      ),
     }))
     .filter((pattern) => pattern.evidence.length > 0);
 

@@ -54,6 +54,9 @@ describe("validateReviewOutput", () => {
       [8, "5.", "Nxf7", "Bxf7+"],
     ]);
     expect(review.moments.every((m) => !m.unverified)).toBe(true);
+    expect(review.moments[0].fen).toBe(p.moments[0].fen);
+    expect(review.moments[0].goodMoves).toEqual(p.moments[0].goodMoves);
+    expect(review.moments[0].winChanceBefore).toBe(p.moments[0].winChanceBefore);
   });
 
   it("marks a moment unverified when it cites a move the engine never showed", () => {
@@ -154,5 +157,20 @@ describe("validateTrendsOutput", () => {
 
   it("rejects malformed trends output", () => {
     expect(() => validateTrendsOutput({ headline: 1 }, digests)).toThrow(InvalidCoachOutputError);
+  });
+});
+
+describe("prompts", () => {
+  it("keeps raw tags out of the review prompt but in plain words for trends", async () => {
+    const { buildReviewPrompt, buildTrendsPrompt } = await import("@/lib/coach/prompts");
+    const { packet: p } = packet();
+    expect(buildReviewPrompt(p)).not.toContain("refutation_capture");
+    expect(buildReviewPrompt(p)).toContain("Nxe5");
+
+    const trends = buildTrendsPrompt([
+      { ...digest("g1", [10]), moments: [{ ...digest("g1", [10]).moments[0], tags: ["hangs_piece"] }] },
+    ]);
+    expect(trends).toContain("left a piece hanging");
+    expect(trends).not.toContain("hangs_piece");
   });
 });

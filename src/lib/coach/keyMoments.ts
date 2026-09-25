@@ -21,13 +21,14 @@ const LABEL_PRIORITY: Record<MomentLabel, number> = {
   inaccuracy: 5,
 };
 
-const CLASSIFICATION_LABELS: Partial<Record<MoveClassification, MomentLabel>> = {
-  [MoveClassification.Blunder]: "blunder",
-  [MoveClassification.Mistake]: "mistake",
-  [MoveClassification.Inaccuracy]: "inaccuracy",
-  [MoveClassification.Splendid]: "brilliant",
-  [MoveClassification.Perfect]: "great",
-};
+const CLASSIFICATION_LABELS: Partial<Record<MoveClassification, MomentLabel>> =
+  {
+    [MoveClassification.Blunder]: "blunder",
+    [MoveClassification.Mistake]: "mistake",
+    [MoveClassification.Inaccuracy]: "inaccuracy",
+    [MoveClassification.Splendid]: "brilliant",
+    [MoveClassification.Perfect]: "great",
+  };
 
 /** The user's win chance (0-100) in a position, or undefined if it has no score. */
 export const userWinChance = (
@@ -35,7 +36,11 @@ export const userWinChance = (
   side: Side
 ): number | undefined => {
   const line = position?.lines[0];
-  if (!position || !line || (line.cp === undefined && line.mate === undefined)) {
+  if (
+    !position ||
+    !line ||
+    (line.cp === undefined && line.mate === undefined)
+  ) {
     return undefined;
   }
   const white = getPositionWinPercentage(position);
@@ -50,18 +55,27 @@ export interface SelectKeyMomentsInput {
   maxMoments?: number;
 }
 
-const isMiss = (prev: number | undefined, before: number, after: number): boolean => {
+const isMiss = (
+  prev: number | undefined,
+  before: number,
+  after: number
+): boolean => {
   if (prev === undefined) return false;
   const gain = before - prev;
   const loss = before - after;
-  return gain >= MISS_MIN_GAIN && loss >= Math.max(MISS_MIN_LOSS, gain * MISS_GIVEBACK_RATIO);
+  return (
+    gain >= MISS_MIN_GAIN &&
+    loss >= Math.max(MISS_MIN_LOSS, gain * MISS_GIVEBACK_RATIO)
+  );
 };
 
 const labelFor = (
   classification: MoveClassification | undefined,
   missed: boolean
 ): MomentLabel | undefined => {
-  const label = classification ? CLASSIFICATION_LABELS[classification] : undefined;
+  const label = classification
+    ? CLASSIFICATION_LABELS[classification]
+    : undefined;
   if (label === "blunder") return label;
   if (missed) return "miss";
   return label;
@@ -89,7 +103,8 @@ export const selectKeyMoments = ({
     const winAfter = userWinChance(positions[ply + 1], userSide);
     if (winBefore === undefined || winAfter === undefined) continue;
 
-    const prev = ply > 0 ? userWinChance(positions[ply - 1], userSide) : undefined;
+    const prev =
+      ply > 0 ? userWinChance(positions[ply - 1], userSide) : undefined;
     const label = labelFor(
       positions[ply + 1].moveClassification,
       isMiss(prev, winBefore, winAfter)
@@ -110,7 +125,8 @@ export const selectKeyMoments = ({
 
   return [...errors, ...goodMoves, ...inaccuracies]
     .sort(
-      (a, b) => LABEL_PRIORITY[a.label] - LABEL_PRIORITY[b.label] || swing(b) - swing(a)
+      (a, b) =>
+        LABEL_PRIORITY[a.label] - LABEL_PRIORITY[b.label] || swing(b) - swing(a)
     )
     .slice(0, maxMoments)
     .sort((a, b) => a.ply - b.ply);

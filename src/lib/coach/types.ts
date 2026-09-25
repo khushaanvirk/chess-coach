@@ -37,12 +37,16 @@ export interface KeyMoment {
 /** Everything Claude is allowed to know about one key moment. */
 export interface PacketMoment {
   ply: number;
+  /** Position before the move. */
+  fen: string;
   /** "12." for a White move, "12..." for a Black move. */
   moveNumber: string;
   label: MomentLabel;
   playedMove: string;
   /** Null when the played move was already the engine's best. */
   bestMove: string | null;
+  /** Engine moves (SAN) about as good as the best one, best first; excludes the played move. */
+  goodMoves: string[];
   winChanceBefore: number;
   winChanceAfter: number;
   /** Engine eval from the user's side, e.g. "+1.20" or "-M3". */
@@ -91,8 +95,12 @@ export interface ReviewedMoment {
   ply: number;
   moveNumber: string;
   label: MomentLabel;
+  fen: string;
   playedMove: string;
   bestMove: string | null;
+  goodMoves: string[];
+  /** The user's win chance with best play from this position (0-100). */
+  winChanceBefore: number;
   title: string;
   explanation: string;
   lesson: string;
@@ -127,7 +135,13 @@ export interface DigestMoment {
 }
 
 export type GameOutcome = "win" | "loss" | "draw" | "unknown";
-export type TimeClass = "bullet" | "blitz" | "rapid" | "classical" | "daily" | "unknown";
+export type TimeClass =
+  | "bullet"
+  | "blitz"
+  | "rapid"
+  | "classical"
+  | "daily"
+  | "unknown";
 
 /** A self-contained summary of one reviewed game, input to cross-game trends. */
 export interface GameDigest {

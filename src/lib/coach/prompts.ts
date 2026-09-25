@@ -1,7 +1,7 @@
-import type { GameDigest, ReviewPacket } from "./types";
+import type { GameDigest, MotifTag, ReviewPacket } from "./types";
 
 /** Bump when prompts or schemas change so cached reviews are regenerated. */
-export const PROMPT_VERSION = 1;
+export const PROMPT_VERSION = 3;
 
 // Kept byte-stable (no per-game values) so the Claude API can cache it.
 export const COACH_SYSTEM_PROMPT = `You are a patient, direct chess coach going over one of your student's games with them.
@@ -9,11 +9,13 @@ export const COACH_SYSTEM_PROMPT = `You are a patient, direct chess coach going 
 Stockfish has already analysed the game. You receive its findings as JSON inside <game_review_data>. Your job is to explain what happened, not to calculate.
 
 Ground rules:
-- The engine data is the truth. Every move you mention must come from that moment's playedMove, bestMove, bestLine or refutationLine, or from the game's move list. Never invent a variation and never claim a tactic the data does not show.
+- The engine data is the truth. Every move you mention must come from that moment's playedMove, bestMove, goodMoves, bestLine or refutationLine, or from the game's move list. Never invent a variation and never claim a tactic the data does not show.
 - The hints were computed by code from the actual position (loose pieces, forks, mates, material). Use them when they help and never contradict them.
+- fen is the position before the move. goodMoves are other moves the engine rates about as good as bestMove.
 - winChanceBefore and winChanceAfter are the student's chances (0-100). materialAfterBestLine and materialAfterPlayedLine are material changes for the student at the end of each engine line (pawn = 1).
 - Pitch the explanation at the student's rating: plain words, name the idea (fork, pin, loose piece, back rank, king safety, trading when ahead, activity), and say what to check for next time.
 - Talk to the student as "you". Be honest about mistakes without being harsh.
+- Write plain chess language. Never quote JSON field names.
 
 What to write:
 - summary: 2-3 sentences telling the story of the game: how it was won, lost or drawn, and the turning point.
@@ -41,7 +43,10 @@ export const REVIEW_JSON_SCHEMA = {
         additionalProperties: false,
         required: ["ply", "title", "explanation", "lesson"],
         properties: {
-          ply: { type: "integer", description: "The ply of the key moment from the input." },
+          ply: {
+            type: "integer",
+            description: "The ply of the key moment from the input.",
+          },
           title: { type: "string" },
           explanation: { type: "string" },
           lesson: { type: "string" },
@@ -54,7 +59,9 @@ export const REVIEW_JSON_SCHEMA = {
 export const buildReviewPrompt = (packet: ReviewPacket): string => {
   const isWhite = packet.game.userSide === "white";
   const student = isWhite ? packet.game.white : packet.game.black;
-  const rating = student.rating ? `rated about ${student.rating}` : "rating unknown";
+  const rating = student.rating
+    ? `rated about ${student.rating}`
+    : "rating unknown";
 
   return [
     `Review this game for ${student.name} (played ${packet.game.userSide}, ${rating}).`,
@@ -63,22 +70,26 @@ export const buildReviewPrompt = (packet: ReviewPacket): string => {
       : "The engine found no key moments for the student; give the summary and takeaways, and return an empty moments list.",
     "",
     "<game_review_data>",
-    JSON.stringify(packet),
+    // Tags are for code (digests, trends); the hints already say the same in words.
+    JSON.stringify({
+      ...packet,
+      moments: packet.moments.map((m) => ({ ...m, tags: undefined })),
+    }),
     "</game_review_data>",
   ].join("\n");
 };
 
 export const TRENDS_SYSTEM_PROMPT = `You are a chess coach looking across a student's recent games to find what is really holding them back.
 
-You receive one compact digest per reviewed game inside <recent_games>. Each digest lists the student's key moments with a label (blunder, miss, mistake, inaccuracy, brilliant, great), the game phase, motif tags computed by code, their remaining clock when available, and the coach's one-line title and lesson for that moment.
+You receive one compact digest per reviewed game inside <recent_games>. Each digest lists the student's key moments with a label (blunder, miss, mistake, inaccuracy, brilliant, great), the game phase, motifs computed by code, their remaining clock when available, and the coach's one-line title and lesson for that moment.
 
 Rules:
 - Only report a pattern that appears in at least 2 different games, and back every pattern with evidence: the gameKey and ply of each moment it comes from, copied exactly from the input. Never invent a gameKey or ply.
-- Prefer causes over symptoms: "leaves pieces undefended after attacking moves" beats "blunders a lot". Look at motif tags, phases, clocks (time trouble), openings and results.
-- Be specific and honest, and talk to the student as "you".
+- Prefer causes over symptoms: "leaves pieces undefended after attacking moves" beats "blunders a lot". Look at motifs, phases, clocks (time trouble), openings and results.
+- Be specific and honest, and talk to the student as "you". Write plain chess language; never quote field names.
 
 What to write:
-- headline: one sentence naming the single biggest thing to fix.
+- headline: one sentence of at most 20 words naming the single biggest thing to fix.
 - patterns: 2-5 recurring patterns, most costly first, each with a short name, a 1-2 sentence description, and evidence.
 - strengths: 1-3 things the student does well, from the data.
 - focusAreas: exactly 3 things to work on this week, each with a concrete way to practise (puzzle themes, a habit to run before each move, an opening line to review).`;
@@ -129,6 +140,18 @@ export const TRENDS_JSON_SCHEMA = {
   },
 } as const;
 
+const MOTIF_PHRASES: Record<MotifTag, string> = {
+  hangs_piece: "left a piece hanging",
+  fork: "walked into a fork",
+  missed_fork: "missed a fork",
+  refutation_check: "allowed a strong check",
+  refutation_capture: "allowed a strong capture",
+  missed_mate: "missed a forced mate",
+  allows_mate: "allowed a forced mate",
+  missed_material: "missed winning material",
+  sacrifice: "sacrificed material",
+};
+
 /** Drops fields Claude doesn't need so a 30-game trends run stays small. */
 export const compactDigest = (digest: GameDigest) => ({
   gameKey: digest.gameKey,
@@ -146,7 +169,7 @@ export const compactDigest = (digest: GameDigest) => ({
     move: m.moveNumber,
     label: m.label,
     phase: m.phase,
-    tags: m.tags,
+    motifs: m.tags.map((tag) => MOTIF_PHRASES[tag]),
     clockSeconds: m.clockSeconds,
     title: m.title,
     lesson: m.lesson,

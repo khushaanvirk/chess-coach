@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Chess } from "chess.js";
-import { buildReviewPacket, formatUserEval } from "@/lib/coach/packet";
+import { buildReviewPacket, formatUserEval, getGoodMoves } from "@/lib/coach/packet";
 import { detectUserSide, getGameKey, getUnsupportedReason } from "@/lib/coach/gameKey";
 import { TRAP_PGN, trapEval } from "./fixtures";
 
@@ -21,6 +21,9 @@ describe("buildReviewPacket", () => {
 
     const [first, second] = packet.moments;
     expect(first.bestMove).toBe("Nxd4");
+    expect(first.fen).toBe("r1bqkbnr/pppp1ppp/8/4p3/2BnP3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4");
+    // The fixture's second line (h3, 40cp worse) is within the good-move margin.
+    expect(first.goodMoves).toEqual(["Nxd4", "h3"]);
     expect(first.bestLine).toEqual(["Nxd4", "exd4", "O-O"]);
     expect(first.refutationLine).toEqual(["Qg5", "Nxf7", "Qxg2", "Rf1", "Qxe4+", "Be2", "Nf3#"]);
     expect(first.winChanceBefore).toBeGreaterThan(first.winChanceAfter);
@@ -65,6 +68,29 @@ describe("buildReviewPacket", () => {
     expect(() =>
       buildReviewPacket({ game: loadTrap(), gameEval: truncated, userSide: "w" })
     ).toThrow(/doesn't match/);
+  });
+});
+
+describe("getGoodMoves", () => {
+  const fen = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1";
+  const position = {
+    lines: [
+      { pv: ["e7e5"], cp: -20, depth: 16, multiPv: 1 },
+      { pv: ["c7c5"], cp: -35, depth: 16, multiPv: 2 },
+      { pv: ["g7g5"], cp: 250, depth: 16, multiPv: 3 },
+    ],
+  };
+
+  it("keeps moves close to the best from the user's side, best first", () => {
+    expect(getGoodMoves(fen, position, "b", "a7a6")).toEqual(["e5", "c5"]);
+  });
+
+  it("never offers the move that was actually played", () => {
+    expect(getGoodMoves(fen, position, "b", "c7c5")).toEqual(["e5"]);
+  });
+
+  it("ignores unscored lines", () => {
+    expect(getGoodMoves(fen, { lines: [{ pv: ["e7e5"], depth: 1, multiPv: 1 }] }, "b", "a7a6")).toEqual([]);
   });
 });
 

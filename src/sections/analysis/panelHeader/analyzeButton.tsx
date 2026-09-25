@@ -50,17 +50,25 @@ export default function AnalyzeButton() {
       return;
     }
 
-    const newGameEval = await engine.evaluateGame({
-      ...params,
-      depth: engineDepth,
-      multiPv: engineMultiPv,
-      setEvaluationProgress,
-      playersRatings: {
-        white: white?.rating,
-        black: black?.rating,
-      },
-      workersNb: engineWorkersNb,
-    });
+    let newGameEval;
+    try {
+      newGameEval = await engine.evaluateGame({
+        ...params,
+        depth: engineDepth,
+        multiPv: engineMultiPv,
+        setEvaluationProgress,
+        playersRatings: {
+          white: white?.rating,
+          black: black?.rating,
+        },
+        workersNb: engineWorkersNb,
+      });
+    } catch (error) {
+      // Don't leave the progress bar frozen; let the user press Analyze again.
+      console.error("Game analysis failed", error);
+      setEvaluationProgress(0);
+      return;
+    }
 
     setEval(newGameEval);
     setEvaluationProgress(0);

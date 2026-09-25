@@ -23,6 +23,9 @@ export class UciEngine {
   private workers: EngineWorker[] = [];
   private workerQueue: WorkerJob[] = [];
   private isReady = false;
+  // While a full-game analysis runs, live-position stops must not abandon its
+  // queued jobs (that left positions without lines and froze analysis at 97%).
+  private isEvaluatingGame = false;
   private enginePath: string;
   private customEngineInit?:
     | ((worker: EngineWorker) => Promise<void>)
@@ -145,6 +148,7 @@ export class UciEngine {
   }
 
   public async stopAllCurrentJobs(): Promise<void> {
+    if (this.isEvaluatingGame) return;
     const abandonedJobs = [...this.workerQueue];
     this.workerQueue = [];
 
@@ -263,6 +267,32 @@ export class UciEngine {
   }: EvaluateGameParams): Promise<GameEval> {
     this.throwErrorIfNotReady();
     this.isReady = false;
+    this.isEvaluatingGame = true;
+    try {
+      return await this.evaluateGameUnguarded({
+        fens,
+        uciMoves,
+        depth,
+        multiPv,
+        setEvaluationProgress,
+        playersRatings,
+        workersNb,
+      });
+    } finally {
+      this.isEvaluatingGame = false;
+      this.isReady = true;
+    }
+  }
+
+  private async evaluateGameUnguarded({
+    fens,
+    uciMoves,
+    depth = 16,
+    multiPv = this.multiPv,
+    setEvaluationProgress,
+    playersRatings,
+    workersNb = 1,
+  }: EvaluateGameParams): Promise<GameEval> {
     setEvaluationProgress?.(1);
 
     await this.setMultiPv(multiPv);
@@ -316,8 +346,18 @@ export class UciEngine {
       })
     );
 
+    // Belt and braces: re-run any position that still came back without lines.
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const missing = positions
+        .map((position, i) => (position?.lines.length ? -1 : i))
+        .filter((i) => i >= 0);
+      if (!missing.length) break;
+      for (const i of missing) {
+        positions[i] = await this.evaluatePosition(fens[i], depth);
+      }
+    }
+
     await this.setWorkersNb(1);
-    this.isReady = true;
 
     const positionsWithClassification = getMovesClassification(
       positions,

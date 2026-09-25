@@ -10,6 +10,7 @@ import PlayersMetric from "./playersMetric";
 import MoveInfo from "./moveInfo";
 import Opening from "./opening";
 import EngineLines from "./engineLines";
+import CoachMoveNote from "../coachTab/coachMoveNote";
 
 export default function AnalysisTab(props: GridProps) {
   const gameEval = useAtomValue(gameEvalAtom);
@@ -61,6 +62,8 @@ export default function AnalysisTab(props: GridProps) {
         )}
 
         <MoveInfo />
+
+        <CoachMoveNote />
 
         <Opening />
 

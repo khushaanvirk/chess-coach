@@ -21,3 +21,7 @@ tsconfig.tsbuildinfo
 .cdk.staging
 cdk.out
 cdk.context.json
+
+# Playwright
+e2e/.results/
+coverage/

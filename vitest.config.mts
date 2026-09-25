@@ -11,7 +11,8 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       include: ["src/lib/coach/**/*.ts"],
-      exclude: ["src/lib/coach/server/**", "src/lib/coach/db.ts"],
+      // IndexedDB-bound glue and the Agent SDK runner are covered by e2e and the smoke test.
+      exclude: ["src/lib/coach/server/**", "src/lib/coach/db.ts", "src/lib/coach/persist.ts"],
     },
   },
 });

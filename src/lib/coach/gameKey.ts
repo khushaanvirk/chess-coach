@@ -18,7 +18,10 @@ const sha256Hex = async (text: string): Promise<string> => {
  * Stable identity for a game across reloads and re-imports. Chesskit's local
  * database id changes per save, so reviews are keyed by this instead.
  */
-export const getGameKey = async (headers: PgnHeaders, sanMoves: string[]): Promise<string> => {
+export const getGameKey = async (
+  headers: PgnHeaders,
+  sanMoves: string[]
+): Promise<string> => {
   if (headers.Link && CHESSCOM_LINK.test(headers.Link)) return headers.Link;
   if (headers.Site && LICHESS_SITE.test(headers.Site)) return headers.Site;
 
@@ -31,10 +34,14 @@ export const getGameKey = async (headers: PgnHeaders, sanMoves: string[]): Promi
   return `sha256:${await sha256Hex(fingerprint)}`;
 };
 
-const normalizeName = (name: string | undefined): string => (name ?? "").trim().toLowerCase();
+const normalizeName = (name: string | undefined): string =>
+  (name ?? "").trim().toLowerCase();
 
 /** Which side the user played, matched against any of their usernames. */
-export const detectUserSide = (headers: PgnHeaders, usernames: string[]): Side | null => {
+export const detectUserSide = (
+  headers: PgnHeaders,
+  usernames: string[]
+): Side | null => {
   const names = new Set(usernames.map(normalizeName).filter(Boolean));
   if (names.has(normalizeName(headers.White))) return "w";
   if (names.has(normalizeName(headers.Black))) return "b";
