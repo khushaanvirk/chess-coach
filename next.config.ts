@@ -1,49 +1,26 @@
-import { withSentryConfig } from "@sentry/nextjs";
 import { NextConfig } from "next";
-import { PHASE_PRODUCTION_BUILD } from "next/constants";
 
-const nextConfig = (phase: string): NextConfig => ({
-  output: phase === PHASE_PRODUCTION_BUILD ? "export" : undefined,
+// Local-only build: no static export, so the coach API routes can run in Node.
+const nextConfig: NextConfig = {
   trailingSlash: false,
   reactStrictMode: true,
   reactCompiler: true,
   images: {
     unoptimized: true,
   },
-  headers:
-    phase === PHASE_PRODUCTION_BUILD
-      ? undefined
-      : async () => [
-          {
-            source: "/engines/:blob*",
-            headers: [
-              {
-                key: "Cache-Control",
-                value: "public, max-age=31536000, immutable",
-              },
-              {
-                key: "Age",
-                value: "181921",
-              },
-            ],
-          },
-        ],
-});
+  // The Agent SDK spawns its bundled Claude Code binary; bundling breaks that.
+  serverExternalPackages: ["@anthropic-ai/claude-agent-sdk"],
+  headers: async () => [
+    {
+      source: "/engines/:blob*",
+      headers: [
+        {
+          key: "Cache-Control",
+          value: "public, max-age=31536000, immutable",
+        },
+      ],
+    },
+  ],
+};
 
-export default withSentryConfig(nextConfig, {
-  // https://docs.sentry.io/platforms/javascript/guides/nextjs/manual-setup/
-  org: process.env.SENTRY_ORG,
-  project: "javascript-nextjs",
-  widenClientFileUpload: true,
-  sourcemaps: {
-    deleteSourcemapsAfterUpload: true,
-  },
-  webpack: {
-    treeshake: {
-      removeDebugLogging: true,
-    },
-    reactComponentAnnotation: {
-      enabled: true,
-    },
-  },
-});
+export default nextConfig;
